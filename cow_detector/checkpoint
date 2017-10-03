@@ -1,2 +1,2 @@
-model_checkpoint_path: "dogs-cats-model"
-all_model_checkpoint_paths: "dogs-cats-model"
+model_checkpoint_path: "cow-notcow-model"
+all_model_checkpoint_paths: "cow-notcow-model"
