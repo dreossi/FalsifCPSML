@@ -27,8 +27,8 @@ T_s_delay = 0.01; % system time reaction
 TTC_inv_safe = 0.2;     
 TTC_inv_warning = 0.5;
 
-z_safe = 1;
-z_warning = 0;
+x_safe = 1;
+x_warning = 0;
 
 warn_brake =  100;    % warning braking 
 panic_brake = 1000;   % emergency braking value  
@@ -41,7 +41,9 @@ miss_u0 = -1;
 
 thresh = 0.01;
 
-%% init outrun model
+x_p0 = 10;
+
+% %% init outrun model
 
 B = BreachSimulinkSystem('outrun_nn');
 
