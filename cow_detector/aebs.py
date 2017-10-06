@@ -71,6 +71,9 @@ def telemetry(sid, data):
             throttle = 1.0 - steering_angle**2 - (speed/speed_limit)**2
 
             print('{} {} {}'.format(steering_angle, throttle, speed))
+
+            throttle = 1
+
             send_control(steering_angle, throttle)
         except Exception as e:
             print(e)
