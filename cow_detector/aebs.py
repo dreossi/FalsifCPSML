@@ -50,7 +50,6 @@ def telemetry(sid, data):
 
         # Detect cow
         pred = nn.predict(image)
-        print(pred)
 
         try:
             image = np.asarray(image)       # from PIL image to numpy array
@@ -70,9 +69,14 @@ def telemetry(sid, data):
                 speed_limit = MAX_SPEED
             throttle = 1.0 - steering_angle**2 - (speed/speed_limit)**2
 
-            print('{} {} {}'.format(steering_angle, throttle, speed))
+            cow_detected = pred[0][0] > 0.9999
 
-            throttle = 1
+            if cow_detected:
+                print('COW DETECTED')
+                print(pred)
+                throttle = -100
+
+            #print('{} {} {}'.format(steering_angle, throttle, speed))
 
             send_control(steering_angle, throttle)
         except Exception as e:
