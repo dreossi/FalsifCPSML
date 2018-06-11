@@ -1,0 +1,278 @@
+%!TEX root = nfm17jar.tex
+
+\section{Machine Learning Analyzer}
+\label{sec:MLanalysis}
+
+A central idea in our approach to analyzing CPSML models
+is to use {\em abstractions} of the ML components. 
+For instance, in the preceding section, we used the notions of
+{\em perfect} ML classifiers and {\em always-wrong} classifiers
+in computing the region of uncertainty (ROU).
+In this section, we extend this abstraction-based approach to
+the ML classifier and its input (feature) space.
+%The analysis involves the construction of
+%an approximation function used to study the original classifiers.
+
+One motivation for our approach comes from the application
+domain of autonomous driving where machine learning is used for
+object detection and perception. 
+Instead of exploring the high-dimensional input space for
+the ML classifier
+involving all combinations of pixels, we instead perform the key
+simplification of 
+{\it exploring realistic and meaningful modifications} to a 
+given image dataset that corresponds to the ROU.
+Autonomous driving groups spend copius amounts of time collecting
+images and video to train their learning-based perception systems with.
+We focus on analyzing the space of images that is ``close'' to this
+data set but with semantically significant modifications that can
+identify problematic cases for the overall system.
+
+The space of modifications to input feature vectors 
+(say, images) induces an abstract space 
+over the concrete feature (image) space.
+Let us denote the abstract input domain by $\abssp$.
+Given a classifier 
+$\class : \featsp \to \labsp$, our ML analyzer computes a simpler 
+function $\absclass : \abssp \to \labsp$ that approximates $\class$ on 
+the abstract domain $\abssp$.
+The abstract domain of the function $\absclass$ is analyzed and clusters of misclassifying
+abstract elements are identified. The concretizations of such elements are subsets of features that are misclassified by the original classifier $\class$.
+We describe further details of this approach in the remainder of this section.
+
+
+\subsection{Feature Space Abstraction}
+\label{sec:input_abs}
+
+%\fixme{Images with you generator?}
+
+Let $\cfeatsp \subseteq \featsp$ be a subset of the feature space of
+$\class : \featsp \to \labsp$.
+Let $\leq$ be a total order on a set $\abssp$ called the abstract set. An abstraction function 
+is an injective function $\absf : \cfeatsp \to \abssp$ that maps every feature vector $\vx \in \cfeatsp$
+to an abstract element $\absf(\vx) \in \abssp$. Conversely, the concretization function
+$\conf : \abssp \to \cfeatsp$ maps every abstraction $\va \in \abssp$ to a feature $\conf(\va) \in \cfeatsp$.
+
+The abstraction and concretization functions play a fundamental
+role in our falsification framework.
+First, they allow us to map the input space of the CPS model to the
+feature space of its classifiers. Second, the abstract space
+can be used to analyze the classifiers on a compact domain
+as opposite to intractable feature spaces.
+These concepts are clarified in the following example, 
+where a feature space of pictures is abstracted into a 
+three-dimensional unit hyper-box.
+
+\begin{example}\label{ex:abs}
+
+Let $\featsp$ be the set of RGB pictures of size $1000\times 600$, i.e., $\featsp = \{0,\dots,255\}^{1000\times600\times3}$.
+Suppose we are interested in analyzing a ML image classifier in the 
+context of our AEBS system. In this case, we are interested in
+images of road scenarios rather than on arbitrary images in $\featsp$. 
+Further, assume that we start with a reference data set of images
+of a car on a two-lane highway with a desert road background, as
+shown in Figure~\ref{fig:X_and_A}.
+Suppose that we are interested only in the constrained feature space
+$\cfeatsp \subseteq \featsp$ comprising this desert road scenario with
+a single car on the highway and three dimensions along which the
+scene can be varied:
+(i) the x-dimension (lateral) position of the car; 
+(ii) the z-dimension (distance from the sensor) position
+of the car, and (iii) the brightness of the image.
+%
+%Suppose that we focus on the constrained feature 
+%	space $\cfeatsp \subseteq \featsp$ composed by the set of pictures of cars overlapped in different positions over a desert road background.
+%	We also consider the brightness level of the picture. 
+The $x$ and $z$ positions of the car
+and the brightness level of the picture can be seen as the dimensions of 
+an abstract set $\abssp$. In this setting, we can define the abstraction and concretization functions $\absf$ and $\conf$
+that relate the abstract set $\abssp = [0,1]^3$ and $\cfeatsp$. For instance, the
+picture $\conf(0,0,0)$ sees the car on the left, close to the observer, and low brightness;
+the picture $\conf(1,0,0)$ places the car shifted to the right;
+on the other extreme, $\conf(1,1,1)$ has the car on the right, far away from the observer, and  
+with a high brightness level. Figure~\ref{fig:X_and_A} depicts some car pictures of $\tilde{\stsp}$
+disposed accordingly to their position in the abstract domain $\abssp$ (the surrounding box).
+	
+	\begin{figure}
+		\centering
+		\includegraphics[scale=0.159]{./pics/abs_space.png}
+		\caption{Feature Space Abstraction. The cube represents the abstract space $\abssp$ with the three dimensions corresponding to three different image modifications. The displayed road images correspond to concretized elements of the concrete feature space $\cfeatsp$.\label{fig:X_and_A}}
+	\end{figure}
+\end{example}
+
+\subsection{Approximation of Learning Components}
+\label{sec:approx_ML}
+
+We now describe how the feature space abstraction can be used to construct an
+approximation that helps the identification of misclassified feature vectors.
+
+Given a classifier $\class : \featsp \to \labsp$ and a constrained feature space $\cfeatsp \subseteq \featsp$,
+we want to determine an approximated classifier $\absclass : \abssp \to \labsp$, such that
+$\err{\absclass}{T} \leq \epsilon$, for some $0 \leq \epsilon \leq 1$
+and test set $T = \{ (\iafeat{1},\ilab{1}), \dots,  (\iafeat{l},\ilab{l}) \}$, with $\ilab{i} = \class(\conf(\iafeat{i}))$,
+for $i = 1,\dots, l$.
+
+Intuitively, the proposed approximation scheme samples elements from 
+the abstract set, computes the labels of the concretized elements using the 
+analyzed learning algorithm, and finally, interpolates the abstract elements
+and the corresponding labels in order to obtain an approximation function.
+The obtained approximation can be used to reason on the considered 
+feature space and identify clusters of potentially misclassified feature vectors.
+
+\begin{algorithm}
+	\caption{Approximation construction of classifier $\class : \featsp \to \labsp$}
+    	\label{algo:approximation}
+    	\begin{algorithmic}[1]
+      		\Function{Approximation}{$\abssp,\conf, \epsilon$}\Comment{$\abssp$ abstract set ($\conf : \abssp \to \cfeatsp$), $0 \leq \epsilon \leq 1$ }
+			\State $T_I \gets \emptyset$
+			\Repeat
+	 	 		\State $T_I \gets T_I \cup$ \Call{sample}{$\abssp,\class$}\label{ln:ti_samp}
+				\State $\absclass \gets$ \Call{interpolate}{$T_I$}\label{ln:interp}
+				\State $T_E \gets$ \Call{sample}{$\abssp,\class$}
+			\Until{$\err{\absclass}{T_E} \leq \epsilon$}\label{ln:halt_con}
+			\State \Return $\absclass$
+      		\EndFunction
+  	\end{algorithmic} 
+\end{algorithm}
+
+The \Call{Approximation}{} algorithm (Algorithm~\ref{algo:approximation}) formalizes the proposed approximation
+construction technique. 
+It receives in input an abstract domain $\abssp$ for the concretization
+function $\conf : \abssp \to \cfeatsp$, with $\cfeatsp \subseteq \featsp$, the error
+threshold $0 \leq \epsilon \leq 1$, and returns a function
+$\absclass : \abssp \to \labsp$ that  approximates $\class$
+on the constrained feature space $\cfeatsp$. The algorithm consists in a loop that
+iteratively improves the approximation $\absclass$.
+At every iteration, the algorithm populates the interpolation test set $T_I$
+by sampling abstract features from $\abssp$ and computing the concretized 
+labels according to $\class$ (Line~\ref{ln:ti_samp}), i.e.,
+\Call{sample}{$\abssp,\class$}$ = \{ (\afeat,\lab) \mid \afeat \in \cabssp, \lab = \class(\conf(\afeat))\}$,
+where $\cabssp \subseteq \abssp$ is a finite subset of samples determined with some 
+sampling method.
+Next, the algorithm interpolates the points of $T_I$ (Line~\ref{ln:interp}).
+The result is a function $\absclass : \abssp \to \labsp$ that simplifies the
+original classifier $\class$ on the concretized constrained feature space $\cfeatsp$.
+The approximation is evaluated on the test set $T_E$.
+Note that at each iteration, $T_E$ changes while $T_I$
+incrementally grows. The algorithm iterates until the error rate $\err{\absclass}{T_E}$
+is smaller than the desired threshold $\epsilon$ (Line~\ref{ln:halt_con}).
+
+The technique with which the samples in $T_E$ and $T_I$ are 
+selected strongly influences the accuracy of the approximation.
+In order to have a good coverage of the abstract set $\abssp$,
+we propose the usage of low-discrepancy sampling methods that,
+differently from uniform random sampling, cover sets quickly and evenly.
+In this work, we use the Halton and lattice sequences, 
+two common and easy-to-implement sampling methods, which we
+explain next.
+%For details see, e.g.,~\cite{niederreiter1988low}.
+
+
+\subsection{Sampling Methods}
+\label{sec:sample_methods}
+
+Discrepancy is a notion from equidistribution theory~\cite{weyl1916gleichverteilung,rosenblatt1995pointwise} that finds application in 
+quasi-Monte Carlo techniques for error estimation and approximating
+the mean, standard deviation, integral,
+global maxima and minima of complicated functions, 
+such as, e.g., our classification functions.
+
+\begin{definition}[Discrepancy~\cite{morokoff1994quasi}]
+	Let $\featsp = \{  \ifeat{1}, \dots, \ifeat{m} \}$ be a finite set of points in
+	$n$-dimensional unit space, i.e., $\featsp \subset [0,1]^n$. The \emph{discrepancy}
+	of $\featsp$ is given by:
+	\begin{equation}
+		\disc{\featsp} = \sup_{B \in J} \mid \frac{\#(\featsp,B)}{m} - vol(B) \mid
+	\end{equation}
+	where $\#(\featsp,B) = |\{ \feat \in \featsp \mid \feat \in B \}|$, i.e., the number of
+	points in $\featsp$ that fall in $B$, $vol(B)$ is the $n$-dimensional volume of $B$,
+	and $J$ is the set of boxes of the form $\{ \vx \in \reals^n | a_i \leq \vx_i \leq b_i \}$,
+	where $i=1,\dots,n$ and $0 \leq a_i < b_i < 1$.
+\end{definition}
+
+\begin{definition}[Low-discrepancy sequence~\cite{morokoff1994quasi}]
+	A \emph{low-discrepancy sequence}, also called 
+	\emph{quasi-random sequence}, is a sequence with the 
+	property that for all $m \in \naturals$,
+	its subsequence $\featsp = \{ \ifeat{1}, \dots, \ifeat{m} \}$ has low discrepancy.
+\end{definition}
+
+Low-discrepancy sequences fill spaces more uniformly than uncorrelated
+random points.
+This property makes low-discrepancy sequences suitable for problems where grids are involved, but it is unknown in advance how fine the grid must be to attain precise results.
+A low-discrepancy sequence can be stopped 
+at any point where convergence is observed, whereas the usual uniform random sampling technique requires a large number of computations between stopping points~\cite{trandafir_quasirandom}. 
+Low-discrepancy sampling methods have
+improved computational techniques in many areas, including
+robotics~\cite{branicky2001quasi}, image processing~\cite{hannaford1993resolution}, computer graphics~\cite{shirley1991discrepancy}, numerical integration~\cite{sloan1994lattice}, and optimization~\cite{niederreiter1992random}.
+
+We now introduce two low-discrepancy sequences that will
+be used in this work. For more sequences and details see, e.g.,~\cite{niederreiter1988low}.
+
+\begin{enumerate}
+	\item \emph{Halton sequence}~\cite{morokoff1994quasi}.
+Based on the choice of an arbitrary prime number $p$,
+the $i$-th sample is obtained by representing $i$ in base $p$, reversing its digits, and 
+moving the decimal point by one position. The resulting number is the $i$-th sample 
+in base $p$. For the multi-dimensional case, it is sufficient to choose a different prime number for each dimension.
+In practice, this procedure corresponds to choosing a prime base $p$, dividing the $[0,1]$ interval in $p$ segments,
+then $p^2$ segments, and so on.
+	\item \emph{Lattice sequence}~\cite{matousek2009geometric}. A lattice can be seen as the generalization of a multi-dimensional grid
+with possibly nonorthogonal axes. Let $\alpha_1, \dots, \alpha_{n-1} \in \reals_{> 0}$ be irrational numbers
+and $m \in \naturals$. The $i$-th sample of a lattice sequence is $(i/m,\{i\alpha_1\}, \dots,\{i\alpha_{n-1}\})$, where the curly braces  
+$\{ \cdot \}$ denote the fractional part of the real value (modulo-one arithmetic). 
+\end{enumerate}
+
+\begin{example}\label{ex:MLan}
+
+	We now analyze two Convolutional Neural Networks (CNNs):
+	the Caffe~\cite{jia2014caffe} version of AlexNet~\cite{krizhevsky2012imagenet} and 
+	the Inception-v3 model of Tensorflow~\cite{tensorflow2015},
+	both trained on the ImageNet database~\cite{imagenet}.
+	We sample $1000$ points from the abstract domain defined in Example~\ref{ex:abs}
+	using the lattice sampling techniques.
+	These points encode the $x$ and $z$ displacements
+	of a car in a picture and its brightness level (see Figure~\ref{fig:X_and_A}).
+	Figure~\ref{fig:mlan} (a) depicts the sampled points with their 
+	concretized labels. The green circles indicate correct classifications,
+	i.e., the classifier identified a car, the red circles denote misclassifications, i.e., no car detected.
+	The linear interpolation of the obtained points
+	leads to an approximation function. The error rates $\err{\absclass}{T_E}$ of the obtained
+	approximations (i.e., the discrepancies between the predictions of the original image classifiers and their approximations)
+	computed on $300$ randomly picked test cases are $0.0867$ and $0.1733$
+	for AlexNet and Inception-v3, respectively.
+	Figure~\ref{fig:mlan} (b) shows the projections of the approximation 
+	functions for the brightness value $0.2$. The more red a region, 
+	the larger the sets of pictures for which the neural networks do not 
+	detect a car. For illustrative purposes, we superimpose the 
+	projections of Figure~\ref{fig:mlan} (b) over the background used for the 
+	picture generation. These illustrations show the regions of the concrete 
+	feature vectors in which a vehicle is misclassified. % by the computed approximation function.	
+	
+	
+\begin{figure}
+\centering
+	\subfloat[Sampling.\label{fig:sampling_lattice}]{
+		\includegraphics[scale=0.125]{./pics/caffe_lat_1000.png}\qquad
+		\includegraphics[scale=0.125]{./pics/tens_lat_1000.png}}\\
+	\subfloat[Interpolation projection.\label{fig:interpolation_lattice}]{
+		\includegraphics[scale=0.125]{./pics/caffe_lat_1000_map.png}\qquad
+		\includegraphics[scale=0.125]{./pics/tens_lat_1000_map.png}}\\
+	\subfloat[Feature space analysis.\label{fig:analysis_inception_alexnet}]{
+		\includegraphics[scale=0.4]{./pics/back_future_caffe.png}\qquad
+		\includegraphics[scale=0.4]{./pics/back_future_tens.png}}
+	\caption{ML analysis of AlexNet network developed with Caffe (top) and Inception-v3 network developed with Tensorflow (bottom) on a road scenario.\label{fig:mlan}}
+\end{figure}
+
+\end{example}
+
+The analysis of Example~\ref{ex:MLan} on AlexNet and Inception-v3 provides useful insights.
+First, we observe that Inception-v3 outperforms AlexNet on the considered road pictures since it correctly classifies
+more pictures than AlexNet. Second, we notice that AlexNet tends to correctly classify pictures in 
+which the $x$ abstract component is either close to $0$ or $1$, i.e., pictures in which the car is not in 
+the middle of the street, but on one of the two lanes. This suggests that the model might not have been
+trained enough with pictures of cars in the center of the road. Third, using the lattice method on Inception-v3,
+we were able to identify a corner case misclassification in a cluster of correct predictions
+(note the isolated red cross with coordinates $(0.1933 ,0.0244,0.4589)$).
+All this information provides insights on the classifiers that can be useful in the hunt for counterexamples. % in cyber-physical
+%systems involving the analyzed classifier. 

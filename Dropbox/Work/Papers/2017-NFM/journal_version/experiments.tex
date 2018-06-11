@@ -1,0 +1,245 @@
+%!TEX root = nfm17jar.tex
+
+\section{Experimental Results}
+\label{sec:experiments}
+
+%--------------------------------------------------------------
+%\subsection{Implementation Details}
+\label{sec:exp:impl}
+
+In this section we present two case studies, both involving
+an Automatic Emergency Braking System (AEBS), but differing
+in the details of the underlying simulator and controller. 
+The first is a Simulink-based AEBS, 
+the second is a Unity-Udacity simulator-based AEBS. 
+
+The falsification framework for the first case study
+has been implemented in a Matlab toolbox.\footnote{\url{https://github.com/dreossi/analyzeNN}}
+The framework for the second case study has been written in Python 
+and C\#.\footnote{\url{https://bitbucket.org/sseshia/uufalsifier}}
+Our tools deal with models of CPSML and STL specifications.
+They mainly consist of a temporal logic falsifier and an ML analyzer that interact to falsify the given STL specification against the
+decomposed models.
+As an STL falsifier, we chose the existing tool Breach~\cite{donze2010breach}, while the
+ML analyzer has been implemented from scratch.
+{\color{blue} Rev 1.1: 
+In the following case studies, we will be interested in simple STL properties
+like, for instance, \lq\lq never collide against an obstacle\rq\rq, whose boolean semantics is enough expressive to capture bad behaviors of the
+considered system. Thus, the validity domain of the given specifications are determined by examining only the 
+qualitative semantics. An analysis based on the quantitative semantics might be interesting as it could provide 
+insights on the considered systems, but it goes outside the scope of our experimental evaluations.
+}
+The ML analyzer implementation has two components:
+the feature space abstractor and the ML approximation algorithm (see Section~\ref{sec:MLanalysis}).
+The feature space abstractor implements a scene generator that concretizes the abstracted feature vectors.
+The algorithm that computes an approximation of the analyzed ML component gives the user the option of 
+selecting the sampling method and interpolation technique, as well as setting the desired error rate.
+Our tools are interfaced with the deep learning frameworks 
+Caffe~\cite{jia2014caffe} and Tensorflow~\cite{tensorflow2015}.
+We ran our tests on a desktop computer Dell XPS 8900, Intel (R) Core(TM) i7-6700 CPU 3.40GHz, DIMM RAM 16 GB 2132  MHz,
+GPUs NVIDIA GeForce GTX Titan X and Titan Xp, with Ubuntu 14.04.5 LTS and Matlab R2016b.
+
+%--------------------------------------------------------------
+\subsection{Case Study 1: Simulink-based AEBS}
+\label{sec:case:simulink}
+
+Our first case study is a closed-loop Simulink model of a semi-autonomous vehicle
+with an Advanced Emergency Braking System (AEBS)~\cite{taeyoung2011development}
+connected to a deep neural network-based image classifier.
+The model mainly consists of a four-speed automatic transmission controller
+linked to an AEBS that automatically prevents collisions with preceding obstacles and alleviates the
+harshness of a crash when a collision is likely to happen (see Figure~\ref{fig:sim_model}).
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.16]{./pics/simu_model.png}
+	\caption{Simulink model of a semi-autonomous vehicle with AEBS. \label{fig:sim_model}}
+\end{figure}
+The AEBS determines a braking mode depending on the speed of the vehicle $v_s$,
+the possible presence of a preceding obstacle, its velocity $v_p$, and the longitudinal distance $dist$ between the two.
+The distance $dist$ is provided by radars having $30$m of range.
+For obstacles farther than $30$m, the camera, connected
+to an image classifier, alerts the AEBS that, in the case of detected obstacle, goes into warning mode.
+
+Depending on $v_s, v_p, dist$, and the presence of obstacles detected by the image classifier,
+the AEBS computes the time to collision and longitudinal safety indices, 
+whose values determine a controlled transition between
+safe, warning, braking, and collision mitigation modes. 
+In safe mode, the car does not need to brake. 
+In warning mode, the driver should brake to avoid a collision.
+If this does not happen, the system goes into braking mode, where the 
+automatic brake slows down the vehicle. 
+Finally, in collision mitigation 
+mode, the system, determining that a crash is unavoidable,
+triggers a full braking action aimed to minimize the damage.
+
+
+To establish the correctness of the system and in particular of its AEBS controller,
+we formalize the STL specification $\G{}(\neg(dist(t)) \leq 0)$, that
+requires $dist(t)$ to always be positive, i.e., no collision happens.
+The input space is $v_s(0) \in [0,40]$ (mph), $dist(0) \in [0,60]$ (m), and the set of 
+all RGB pictures of size $1000\times 600$. The preceding vehicle is not moving, i.e.,
+$v_p(t) = 0$ (mph).
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{./pics/MLFalsifyingRegion.pdf}
+	\caption{Validity domain for $\G{}(\neg(dist(t)) \leq 0)$ and AEBS model with different abstractions of ML component. {\footnotesize{The initial velocity and distance are on the x and y axes respectively.
+The dotted (horizontal) line is the image classifier activation threshold.
+Green indicates combinations of initial velocity and distance for which the property is satisfied and red indicates combinations for which the property is falsified. Our ML analyzer performs both optimistic (left) and pessimistic (middle) abstractions of the neural network classifier. 
+	On the right-most image, the yellow region denotes the region of uncertainty (ROU).}}
+\label{fig:ml_analysis_vis}}
+\end{figure}
+
+\begin{figure}
+  	\centering
+    	\includegraphics[width=0.5\textwidth]{./pics/no_miss.png}
+	\caption{Analysis of Region of Uncertainty (ROU) for AEBS and property $\G{}(\neg(dist(t)) \leq 0)$. 
+Red crosses in the ROU denote misclassifications generated by the ML analyzer that
+leads to a system-level counterexample. A circle denotes a ``benign'' misclassification.
+	\label{fig:no_miss}}
+\end{figure}
+
+At first, we compute the validity domain of $\varphi$ assuming that the radars are able to provide
+exact measurements for any distance $dist(t)$ and the image classifier correctly detects the 
+presence of a preceding vehicle. The computed validity domain 
+is depicted in Figure~\ref{fig:ml_analysis_vis} (left-most image): green for $U_\varphi$
+and red for $U_{\neg{\varphi}}$. Next, we try to identify candidate counterexamples 
+that belong to the satisfactory set (i.e., the inputs that satisfy the specification) but might be influenced by a misclassification of the image classifier.
+Since the AEBS relies on the classifier only for distances larger than $30$m, we can focus on the
+subset of the input space with $dist(0) \geq 30$. Specifically, we identify potential counterexamples
+by analyzing a pessimistic version of the model where the ML component always misclassifies 
+the input pictures (see Figure~\ref{fig:ml_analysis_vis}, middle image).
+From these results, we can compute the region of uncertainty, shown in
+Figure~\ref{fig:ml_analysis_vis} on the right.
+We can then focus our attention on the ROU, as shown in Fig.~\ref{fig:no_miss}.
+In particular, we can identify candidate counterexamples,
+such as, for instance, $(25,40)$ (i.e., $v_s(0) = 25$ and $dist(0) = 40$).
+
+%\begin{figure}
+%	\centering
+%	\subfloat[Validity domain $\G{}(\neg(dist(t)) \leq 0)$. \label{fig:no_miss}]{\includegraphics[scale = 0.15]{./pics/no_miss.png}}
+%	\subfloat[Falsifying picture (using Caffe).\label{fig:falsif_pic}]{\includegraphics[scale=0.2]{./pics/falsif_pic.png}}
+%	\caption{Compositional falsification: the validity map (right) identifies critical inputs that lead to potential 
+%	counterexamples (right). }
+%\end{figure}
+
+Next, let us consider the AlexNet image classifier and the ML analyzer presented in Section~\ref{sec:MLanalysis} that generates
+pictures from the abstract feature space $\abssp = [0,1]^3$, where the dimensions of $\abssp$
+determine the $x$ and $z$ displacements of a car and the brightness of a generated picture, respectively.
+The goal now is to determine an abstract feature $\va_c \in \abssp$ related to the candidate counterexample $(25,40)$,
+that generates a picture that is misclassified by the ML component and might lead to a violation of the specification $\varphi$.
+The $dist(0)$ component of $\vu_c = (25,40)$ determines a precise $z$ displacement $\va_2 = 0.2$ in the abstract picture.
+{\color{blue} Rev 1.6: The connection between the abstract and input spaces is defined by the abstraction function that, in this case,
+was manually defined by the user. In general, this connection can be explicitly provided by a synthetic data generator such as, for instance, a simulator.}
+Now, we need to determine the values of the abstract $x$ displacement and brightness. Looking at the interpolation
+projection of Figure~\ref{fig:mlan} (b), we notice that the approximation function misclassifies pictures with abstract component $\va_1 \in [0.4,0.5]$ and $\va_3 = 0.2$. Thus, it is reasonable to try to falsify
+the original model on the input element $v_s(0) = 25, dist(0) = 40$, and concretized picture $\conf(0.5,0.2,0.2)$.
+For this targeted input, the temporal logic falsifier computed a robustness value for $\varphi$ of $-24.60$, meaning that a falsifying counterexample
+has been found. Other counterexamples found with the same technique are, e.g.,  
+$(27,45)$ or $(31,56)$ that, associated with the correspondent concretized pictures with $\va_1 = 0.5$ and $\va_3 = 0.2$, lead to the robustness values  $-23.86$ and $-24.38$, respectively (see Figure~\ref{fig:no_miss}, red crosses). Conversely, we also disproved some candidate counterexamples,
+such as $(28,50)$, $(24,35)$, or $(25,45)$, whose robustness values are $9.93, 7.40$, and $7.67$ (see Figure~\ref{fig:no_miss}, green circles).
+
+For experimental purposes, we try to falsify a counterexample in which we change the $x$ position of the abstract feature so that
+the approximation function correctly classifies the picture. For instance, by altering the counterexample $(27,45)$ with 
+$\conf(0.5,0.225,0.2)$ to $(27,45)$ with $\conf(1.0,0.225,0.2)$, we obtain a robusteness value of $9.09$, that means that the AEBS
+is able to avoid the car for the same combination of velocity and distance of the counterexample, but different $x$ position of the preceding vehicle.
+Another example, is the robustness value $-24.38$ of the falsifying input $(31,56)$ with $\conf(0.5,0.28,0.2)$, that altered to $\conf(0.0,0.28,0.2)$,
+changes to $12.41$.
+
+Finally, we test Inception-v3 on the corner case misclassification identified in Section~\ref{sec:approx_ML}
+(i.e., the picture $\conf(0.1933,0.0244,0.4589)$). The distance $dist(0) = 4.88$ related to this abstract feature is below the activation
+threshold of the image classifier. Thus, the falsification points are exactly the same as those of the computed validity domain (i.e., $dist(0) = 4.88$
+and $v_s(0) \in [4,40]$). This study shows how a misclassification of the ML component might not affect the correctness of the CPSML model.
+
+%--------------------------------------------------------------
+\subsection{Case Study 2: Unity-Udacity Simulator-based AEBS}
+\label{sec:case:uubsim}
+
+We now analyze an AEBS deployed within Udacity's self-driving car simulator.\footnote{Udacity's Self-Driving Car Simulator: \url{https://github.com/udacity/self-driving-car-sim}} The simulator,
+built with the Unity game engine\footnote{Unity: \url{https://unity3d.com/}},  can be used to teach cars how to navigate roads using deep learning. We modified the simulator
+in order to focus exclusively on the braking system. In our settings, the car steers by following some predefined waypoints, while 
+acceleration and braking are controlled by an AEBS connected to a CNN.
+An onboard camera sends images to the CNN whose
+task is to detect cows on the road. Whenever an obstacle is detected, the AEBS triggers a brake that slows the vehicle down and prevents the collision against the obstacle. 
+
+We implemented a CNN that classifies the pictures captured by the onboard camera in two categories
+\lq\lq cow\rq\rq\ and \lq\lq not cow\rq\rq.
+The CNN has been implemented and trained using Tensorflow.
+We connected the CNN to the Unity C\# class that controls the car. The communication between the neural network and the
+braking controller happens via Socket.IO protocol.\footnote{Socket.IO protocol: \url{https://github.com/socketio}}
+A screenshot of the car braking in presence of a cow is shown in Figure~\ref{fig:cow_no_collision}.
+A video of the AEBS in action can be seen at \url{https://www.youtube.com/watch?v=Sa4oLGcHAhY}.
+
+\begin{figure}
+	\resizebox{\textwidth}{!}{
+	\subfloat[Correct detection and braking.\label{fig:cow_no_collision}]{\includegraphics[scale=0.3]{./pics/cow_no_collision.png}}
+	~
+	\subfloat[Misclassification and collision.\label{fig:cow_collision}]{\includegraphics[scale=0.1515]{./pics/cow_collision.png}}
+	}
+	\caption{Unity-Udacity simulator AEBS. The onboard camera sends images to the CNN. When a cow is detected
+	a braking action is triggered until the car comes to a complete stop.
+	Full videos available at \protect\url{https://www.youtube.com/watch?v=Sa4oLGcHAhY} and \protect\url{https://www.youtube.com/watch?v=MaRoU5OgimE}. \label{fig:unity_aebs}}
+\end{figure}
+
+
+The CNN architecture is depicted in Figure~\ref{fig:nn}.
+The network consists of eight layers: the first six are alternations of convolutions and max-pools with ReLU activations,
+the last two are a fully connected layer and a softmax that outputs the network prediction.
+The dimensions and hyperparameters of our neural network are
+shown in Table~\ref{tab:nn_params}, where $l$ is a layer, $n_{H}^{[l]} \times n_{W}^{[l]} \times n_{C}^{[l]}$ is the dimension of the volume computed by the layer $l$,
+$f^{[l]}$ is the filter size, $p^{[l]}$ is the padding, and $s^{[l]}$ is the stride.
+
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.25]{./pics/nn.png}
+	\caption{CNN architecture. \label{fig:nn}}
+\end{figure}
+
+\begin{table}
+	\centering
+	\resizebox{\textwidth}{!}{
+	\begin{tabular}{| c | c c c c c c c c c |}
+		\hline
+		 & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8\\
+		 \hline
+		 $n_{H}^{[l]} \times n_{W}^{[l]} $	& $128 \times 128$ & $128 \times 128$ & $64 \times 64$ & $64 \times 64$ & $32 \times 32$ & $32 \times 32$ & $16 \times 16$ & $128 \times 1$ & $2 \times 1$	\\
+		 $n_{C}^{[l]}$				& 3 & 32 & 32 & 32 & 32 & 64 & 64 & 1 & 1\\
+		 $f^{[l]}$ & - & 3 & 2 & 3 & 2 & 3 & 2 & - & - \\
+		 $p^{[l]}$ & - & 1 & 0 & 1 & 0 & 1 & 0 & - & - \\
+		 $s^{[l]}$ & - & 1 & 2 & 1 & 2 & 1 & 2 & - & - \\
+		 \hline
+	\end{tabular}}
+	\caption{CNN dimensions and hyperparameters.\label{tab:nn_params}}
+\end{table}
+
+Our dataset, composed by $1$k road images, was split into $80\%$ train data and $20\%$ validation.
+We trained our model using cross-entropy cost function and Adam algorithm optimizer with learning rate $10^{-4}$. Our model 
+reached $0.95$ accuracy on the validation set.
+
+In our experimental evaluation, we are interested in finding a case where our AEBS fails, i.e., the car collides against a cow.
+This requirement can be formalized as the STL specification 
+$\G{}( \norm{\vx_{car}- \vx_{cow}} > 0 )$ that imposes the Euclidean distance of the car and cow positions
+($\vx_{car}$ and $\vx_{cow}$, respectively) to be always positive. 
+
+%The input of the AEBS system is the RGB image captured by the onboard camera.
+We analyzed the CNN feature space by considering the abstract space $\abssp = [0,1]^3$, where the dimensions of $\abssp$
+determine the displacement of the cow of $\pm 4$m along the $x$-axis, its rotation along the $y$-axis, and the intensity of the red color channel.
+We sampled the elements from the abstract space using both Halton sequence and a grid-based approach. The obtained results are shown
+in Figure~\ref{fig:cnn_cow_analysis}. In both figures, green points are 
+those that lead to images that are correctly classified by the CNN;
+conversely, red points denote images that are misclassified by the CNN and can potentially lead to a system falsification. Note how we were able
+to identify a cluster of misclassifying images (lower-left corners of both Figures~\ref{fig:grid_cow} and~\ref{fig:halton_cow}) as well as an isolated corner case (upper-center, Figure~\ref{fig:grid_cow}).
+
+\begin{figure}
+	\subfloat[Grid-based sampling.\label{fig:grid_cow}]{\includegraphics[scale=0.35]{./pics/grid_500.png}}
+	\subfloat[Halton sequence sampling.\label{fig:halton_cow}]{\includegraphics[scale=0.35]{./pics/quasi_500.png}}
+	\caption{CNN analysis.\label{fig:cnn_cow_analysis}}
+\end{figure}
+
+Finally, we ran some simulations with the misclassifying images 
+identified by our analysis. Most of the them brought the car to collide
+against the cow. A screenshot of a collision is shown in Figure~\ref{fig:cow_collision}.
+The full video is available at~\url{https://www.youtube.com/watch?v=MaRoU5OgimE}.
+
+
+

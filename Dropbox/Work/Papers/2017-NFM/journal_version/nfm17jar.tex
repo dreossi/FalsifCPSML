@@ -1,0 +1,134 @@
+
+%%%%%%%%%%%%%%%%%%%%%%% file typeinst.tex %%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% This is the LaTeX source for the instructions to authors using
+% the LaTeX document class 'llncs.cls' for contributions to
+% the Lecture Notes in Computer Sciences series.
+% http://www.springer.com/lncs       Springer Heidelberg 2006/05/04
+%
+% It may be used as a template for your own input - copy it
+% to a new file with a new name and use it as the basis
+% for your article.
+%
+% NB: the document class 'llncs' has its own and detailed documentation, see
+% ftp://ftp.springer.de/data/pubftp/pub/tex/latex/llncs/latex2e/llncsdoc.pdf
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%\documentclass[runningheads,a4paper]{llncs}
+\documentclass[smallextended]{svjour3}
+
+\usepackage{amssymb,amsmath}
+\usepackage{subfig} 
+\usepackage{array,booktabs}
+
+\setcounter{tocdepth}{3}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+
+\usepackage{tikz} 
+\usetikzlibrary{arrows,automata,shapes} % LATEX and plain TEX 
+\tikzstyle{every picture}+=[remember picture]
+\everymath{\displaystyle}
+
+\usepackage[ruled]{algorithm}
+\usepackage{algpseudocode}
+
+\usepackage{url}
+\urldef{\mailsts}\path|{dreossi, sseshia}@berkeley.edu|    
+\urldef{\mailsa}\path|alex.r.donze@gmail.com|    
+
+%\newcommand{\keywords}[1]{\par\addvspace\baselineskip
+%\noindent\keywordname\enspace\ignorespaces#1}
+
+\input{macro}
+
+%\renewcommand{\baselinestretch}{0.943}
+\renewcommand{\baselinestretch}{0.99}
+
+\begin{document}
+
+%\mainmatter  % start of an individual contribution
+
+% first the title is needed
+\title{Compositional Falsification of Cyber-Physical Systems with Machine Learning Components\thanks{This work is funded in part by the DARPA BRASS program under agreement number FA8750-16-C-0043, NSF grants CNS-1646208, CNS-1545126, and CCF-1139138,
+and by TerraSwarm, one of six centers of STARnet, a Semiconductor Research Corporation program sponsored by MARCO and DARPA. The second author did much of the work while affiliated with UC Berkeley. We gratefully acknowledge the support of NVIDIA Corporation with the donation of the Titan Xp GPU used for this research.}}
+
+
+% a short form should be given in case it is too long for the running head
+\titlerunning{Compositional Falsification of CPSML}
+
+% the name(s) of the author(s) follow(s) next
+%
+% NB: Chinese authors should write their first names(s) in front of
+% their surnames. This ensures that the names appear correctly in
+% the running heads and the author index.
+%
+\author{Tommaso Dreossi \and Alexandre Donz\'e \and Sanjit A. Seshia}
+%
+\authorrunning{Dreossi, Donz\'e, Seshia}
+% (feature abused for this document to repeat the title also on left hand pages)
+
+% the affiliations are given next; don't give your e-mail address
+% unless you accept that it will be published
+\institute{T. Dreossi \at
+	University of California, Berkeley\\
+	\email{dreossi@berkeley.edu}
+	\and
+	A. Donz\'e \at
+	Decyphir, Inc.\\
+	\email{alex.r.donze@gmail.com}
+	\and
+	S. A. Seshia \at
+	University of California, Berkeley\\
+	\email{sseshia@berkeley.edu}
+}
+
+%
+% NB: a more complex sample for affiliations and the mapping to the
+% corresponding authors can be found in the file "llncs.dem"
+% (search for the string "\mainmatter" where a contribution starts).
+% "llncs.dem" accompanies the document class "llncs.cls".
+%
+
+%\toctitle{Lecture Notes in Computer Science}
+%\tocauthor{Authors' Instructions}
+\maketitle
+
+
+\begin{abstract}
+Cyber-physical systems (CPS), such as automotive systems, are starting to include
+sophisticated machine learning (ML) components. Their correctness, therefore, depends on
+properties of the inner ML 
+modules. While learning algorithms aim to generalize from examples, they are only 
+as good as the examples provided, and 
+recent efforts have shown that they can produce inconsistent output under small
+adversarial perturbations. This raises the question: can the output from learning components
+lead to a failure of the entire CPS? In this work, we address this question by
+formulating it as a problem of
+falsifying signal temporal logic (STL) specifications for CPS with ML components. 
+We propose a compositional falsification framework where a temporal
+logic falsifier and a machine learning analyzer cooperate with the aim  
+of finding falsifying executions of the considered model. The efficacy
+of the proposed technique is shown on an automatic emergency braking system
+model with a perception component based on deep neural networks.
+\keywords{Cyber-physical systems, machine learning, falsification, temporal logic, deep learning, neural networks, autonomous driving}
+\end{abstract}
+
+\input{introduction}
+\input{background}
+\input{framework}
+\input{ml_abstraction}
+\input{experiments}
+\input{conclusion}
+
+\bibliographystyle{abbrv}
+\bibliography{refs}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
