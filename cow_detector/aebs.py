@@ -48,6 +48,8 @@ def telemetry(sid, data):
         data = np.fromstring(stream.getvalue(), dtype=np.uint8)
         image = cv2.imdecode(data, 1)
 
+        print(image.shape)
+
         # Detect cow
         pred = nn.predict(image)
 
